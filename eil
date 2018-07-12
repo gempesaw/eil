@@ -75,6 +75,8 @@ curl -v $PUBLIC_DNS
 
 # cleanup
 echo "
+webapp is running at public dns name $PUBLIC_DNS.
+
 the following may be useful for cleanup:
 
 aws ec2 terminate-instances --instance-id $INSTANCE && \\
