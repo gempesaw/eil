@@ -6,14 +6,14 @@ export AWS_PROFILE=eil
 RAND=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
 
 SECURITY_GROUP=$RAND-sg
-echo "creating security group..."
+echo "creating security group $SECURITY_GROUP..."
 SG_ID=$(aws ec2 create-security-group \
     --group-name $SECURITY_GROUP \
     --vpc-id vpc-0d1f73412462f6f02 \
     --description "security group" | jq -r .GroupId)
 
 MY_IP=$(curl -s ipinfo.io/ip)
-echo "opening security group ports 22 & 80"
+echo "opening $SECURITY_GROUP security group ports 22 & 80"
 aws ec2 authorize-security-group-ingress \
     --group-name $SECURITY_GROUP \
     --protocol tcp \
@@ -26,8 +26,8 @@ aws ec2 authorize-security-group-ingress \
     --port 80 \
     --cidr 0.0.0.0/0
 
-echo "creating key pair"
 KEY=$RAND-key
+echo "creating key pair $KEY"
 aws ec2 create-key-pair \
     --key-name $KEY \
     --query 'KeyMaterial' \
@@ -42,18 +42,18 @@ INSTANCE=$(aws ec2 run-instances \
                --instance-type t2.micro \
                --key-name $KEY | jq -r .Instances[0].InstanceId)
 
-echo "waiting for instance to be running..."
+echo "waiting for instance $INSTANCE to be running..."
 aws ec2 wait instance-running --instance-ids $INSTANCE
 PUBLIC_DNS=$(aws ec2 describe-instances --instance-ids $INSTANCE | jq -r .Reservations[0].Instances[0].PublicDnsName)
 
-echo "connecting to instance to start server"
+echo "connecting to $INSTANCE to start server..."
 ssh -o "StrictHostKeyChecking no" -i $KEY.pem ec2-user@$PUBLIC_DNS "(mkdir -p server; cd server; echo 'hello world' > index.html; sudo python -m SimpleHTTPServer 80) &> /dev/null &"
 
 
-echo "sleeping a second to let \"server\" start..."
+echo "sleeping a second to let server start..."
 sleep 5
 
-echo "testing server: "
+echo "testing server via curl: "
 curl -v $PUBLIC_DNS
 
 # cleanup
