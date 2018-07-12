@@ -15,7 +15,21 @@ $ aws configure --profile eil
 # region
 ```
 
-then try `./eil`.
+then, try `./eil`.
+
+## alternative docker usage
+
+To avoid requiring the dependencies locally, there's a docker image
+with all the binaries:
+
+```bash
+$ docker pull gempesaw/eil:deps
+$ docker run -it --rm --entrypoint sh -v $(pwd):$(pwd) -w $(pwd) gempesaw/eil:deps
+```
+
+at which point, you can set your aws credentials `aws configure
+--profile eil` and subsequently run `./eil`.
+
 ## example output
 
 ```bash
