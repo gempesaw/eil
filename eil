@@ -12,6 +12,8 @@ SG_ID=$(aws ec2 create-security-group \
     --vpc-id vpc-0d1f73412462f6f02 \
     --description "security group" | jq -r .GroupId)
 
+# unfortunately this curl relies on an external service, but! not
+# opening 22 to the world is p. nice...
 MY_IP=$(curl -s ipinfo.io/ip)
 echo "opening $SECURITY_GROUP security group ports 22 & 80"
 aws ec2 authorize-security-group-ingress \
@@ -35,7 +37,6 @@ aws ec2 create-key-pair \
 chmod 400 $KEY.pem
 
 echo "
-
 starting instance..."
 INSTANCE=$(aws ec2 run-instances \
                --image-id ami-466768ac \
@@ -46,26 +47,34 @@ INSTANCE=$(aws ec2 run-instances \
 
 echo "waiting for instance $INSTANCE to be running..."
 aws ec2 wait instance-running --instance-ids $INSTANCE
+
 aws ec2 wait instance-status-ok --instance-ids $INSTANCE
 PUBLIC_DNS=$(aws ec2 describe-instances --instance-ids $INSTANCE | jq -r .Reservations[0].Instances[0].PublicDnsName)
 echo "$INSTANCE is running with public dns $PUBLIC_DNS."
 
 echo "
+connecting to $INSTANCE at $PUBLIC_DNS to install dependencies & webapp..."
 
-connecting to $INSTANCE at $PUBLIC_DNS to start server..."
-ssh -o "StrictHostKeyChecking no" -i $KEY.pem ec2-user@$PUBLIC_DNS "(mkdir -p server; cd server; echo 'hello world' > index.html; sudo python -m SimpleHTTPServer 80) &> /dev/null &"
+# probably better to find an image with pip already...
+ssh -o "StrictHostKeyChecking no" -i $KEY.pem ec2-user@$PUBLIC_DNS "(curl https://bootstrap.pypa.io/get-pip.py | sudo python; sudo pip install Flask; echo 'from flask import Flask
+app = Flask(__name__)
 
-echo "sleeping a bit to let server start..."
-sleep 5
+@app.route(\"/\")
+def hello():
+    return \"hello world, from flask\"' > app.py)"
+
+echo "starting server..."
+ssh -o "StrictHostKeyChecking no" -i $KEY.pem ec2-user@$PUBLIC_DNS "(sudo flask run --host=0.0.0.0 --port=80) &> log &"
+
+echo "sleeping a bit to let the server start..."
+sleep 10
 
 echo "
-
 testing server via curl: "
 curl -v $PUBLIC_DNS
 
 # cleanup
 echo "
-
 the following may be useful for cleanup:
 
 aws ec2 terminate-instances --instance-id $INSTANCE && \\
