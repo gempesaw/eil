@@ -58,7 +58,9 @@ ssh -o "StrictHostKeyChecking no" -i $KEY.pem ec2-user@$PUBLIC_DNS "(mkdir -p se
 echo "sleeping a bit to let server start..."
 sleep 5
 
-echo "testing server via curl: "
+echo "
+
+testing server via curl: "
 curl -v $PUBLIC_DNS
 
 # cleanup

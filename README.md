@@ -1,6 +1,6 @@
 # eil
 
-*e*c2 *i*nstance *l*auncher
+**E**c2 **I**nstance **L**auncher
 
 ## usage
 
@@ -27,8 +27,13 @@ $ docker pull gempesaw/eil:deps
 $ docker run -it --rm --entrypoint sh -v $(pwd):$(pwd) -w $(pwd) gempesaw/eil:deps
 ```
 
-at which point, you can set your aws credentials `aws configure
---profile eil` and subsequently run `./eil`.
+at which point, once inside the docker image, you're back at the usage
+instructions:
+
+```bash
+$ aws configure --profile eil
+$ ./eil
+```
 
 ## example output
 
