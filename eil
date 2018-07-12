@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+# ! /usr/bin/env bash
 
 export AWS_PROFILE=eil
 
@@ -42,27 +42,27 @@ INSTANCE=$(aws ec2 run-instances \
                --instance-type t2.micro \
                --key-name $KEY | jq -r .Instances[0].InstanceId)
 
-echo "waiting for instance to be up..."
+echo "waiting for instance to be running..."
 aws ec2 wait instance-running --instance-ids $INSTANCE
 PUBLIC_DNS=$(aws ec2 describe-instances --instance-ids $INSTANCE | jq -r .Reservations[0].Instances[0].PublicDnsName)
 
-echo "connecting to instance & starting \"server\"..."
-echo "
-mkdir -p server
-cd server
-echo 'hello world' > index.html
-nohup sudo python -m SimpleHTTPServer 80 2>&1 &
-" | ssh -o "StrictHostKeyChecking no" -i $KEY.pem ec2-user@$PUBLIC_DNS
+echo "connecting to instance to start server"
+ssh -o "StrictHostKeyChecking no" -i $KEY.pem ec2-user@$PUBLIC_DNS "(mkdir -p server; cd server; echo 'hello world' > index.html; sudo python -m SimpleHTTPServer 80) &> /dev/null &"
+
 
 echo "sleeping a second to let \"server\" start..."
 sleep 5
-curl -vs $PUBLIC_DNS
+
+echo "testing server: "
+curl -v $PUBLIC_DNS
 
 # cleanup
-echo "the following may be useful for cleanup:
+echo "
+
+the following may be useful for cleanup:
 
 aws ec2 terminate-instances --instance-id $INSTANCE && \\
 aws ec2 wait instance-terminated --instance-ids $INSTANCE && \\
 aws ec2 delete-security-group --group-name $SECURITY_GROUP && \\
 aws ec2 delete-key-pair --key-name $KEY && \\
-rm $KEY.pem"
+rm -f $KEY.pem"
