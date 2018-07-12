@@ -34,7 +34,9 @@ aws ec2 create-key-pair \
     --output text > $KEY.pem
 chmod 400 $KEY.pem
 
-echo "starting instance..."
+echo "
+
+starting instance..."
 INSTANCE=$(aws ec2 run-instances \
                --image-id ami-466768ac \
                --security-group-ids $SG_ID \
@@ -44,13 +46,16 @@ INSTANCE=$(aws ec2 run-instances \
 
 echo "waiting for instance $INSTANCE to be running..."
 aws ec2 wait instance-running --instance-ids $INSTANCE
+aws ec2 wait instance-status-ok --instance-ids $INSTANCE
 PUBLIC_DNS=$(aws ec2 describe-instances --instance-ids $INSTANCE | jq -r .Reservations[0].Instances[0].PublicDnsName)
+echo "$INSTANCE is running with public dns $PUBLIC_DNS."
 
-echo "connecting to $INSTANCE to start server..."
+echo "
+
+connecting to $INSTANCE at $PUBLIC_DNS to start server..."
 ssh -o "StrictHostKeyChecking no" -i $KEY.pem ec2-user@$PUBLIC_DNS "(mkdir -p server; cd server; echo 'hello world' > index.html; sudo python -m SimpleHTTPServer 80) &> /dev/null &"
 
-
-echo "sleeping a second to let server start..."
+echo "sleeping a bit to let server start..."
 sleep 5
 
 echo "testing server via curl: "
