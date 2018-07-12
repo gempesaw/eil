@@ -1,0 +1,68 @@
+#! /usr/bin/env bash
+
+export AWS_PROFILE=eil
+
+# use LC_CTYPE setting for tr os x compat...
+RAND=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+
+SECURITY_GROUP=$RAND-sg
+echo "creating security group..."
+SG_ID=$(aws ec2 create-security-group \
+    --group-name $SECURITY_GROUP \
+    --vpc-id vpc-0d1f73412462f6f02 \
+    --description "security group" | jq -r .GroupId)
+
+MY_IP=$(curl -s ipinfo.io/ip)
+echo "opening security group ports 22 & 80"
+aws ec2 authorize-security-group-ingress \
+    --group-name $SECURITY_GROUP \
+    --protocol tcp \
+    --port 22 \
+    --cidr $MY_IP/32
+
+aws ec2 authorize-security-group-ingress \
+    --group-name $SECURITY_GROUP \
+    --protocol tcp \
+    --port 80 \
+    --cidr 0.0.0.0/0
+
+echo "creating key pair"
+KEY=$RAND-key
+aws ec2 create-key-pair \
+    --key-name $KEY \
+    --query 'KeyMaterial' \
+    --output text > $KEY.pem
+chmod 400 $KEY.pem
+
+echo "starting instance..."
+INSTANCE=$(aws ec2 run-instances \
+               --image-id ami-466768ac \
+               --security-group-ids $SG_ID \
+               --count 1 \
+               --instance-type t2.micro \
+               --key-name $KEY | jq -r .Instances[0].InstanceId)
+
+echo "waiting for instance to be up..."
+aws ec2 wait instance-running --instance-ids $INSTANCE
+PUBLIC_DNS=$(aws ec2 describe-instances --instance-ids $INSTANCE | jq -r .Reservations[0].Instances[0].PublicDnsName)
+
+echo "connecting to instance & starting \"server\"..."
+echo "
+mkdir -p server
+cd server
+echo 'hello world' > index.html
+nohup sudo python -m SimpleHTTPServer 80 2>&1 &
+" | ssh -o "StrictHostKeyChecking no" -i $KEY.pem ec2-user@$PUBLIC_DNS
+
+echo "sleeping a second to let \"server\" start..."
+sleep 5
+curl -vs $PUBLIC_DNS
+
+# cleanup
+echo "the following may be useful for cleanup:
+
+aws ec2 terminate-instances --instance-id $INSTANCE && \\
+aws ec2 wait instance-terminated --instance-ids $INSTANCE && \\
+aws ec2 delete-security-group --group-name $SECURITY_GROUP && \\
+aws ec2 delete-key-pair --key-name $KEY && \\
+rm $KEY.pem"
